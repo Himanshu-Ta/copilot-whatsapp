@@ -31,6 +31,7 @@ directline_url = "https://directline.botframework.com/v3/directline/conversation
 # Store conversation IDs for each user
 user_conversations = {}
 
+
 # Function to create a DirectLine conversation
 def create_conversation():
     try:
@@ -44,7 +45,11 @@ def create_conversation():
         return conversation_id
     except requests.RequestException as e:
         logger.error(f"Error creating conversation: {e}")
+        if response is not None:
+            logger.error(f"Response status code: {response.status_code}")
+            logger.error(f"Response content: {response.text}")
         return None
+
 
 # Function to send message to Copilot via DirectLine
 def send_message_to_copilot(conversation_id, user_message):
@@ -61,6 +66,7 @@ def send_message_to_copilot(conversation_id, user_message):
     except requests.RequestException as e:
         logger.error(f"Error sending message to Copilot: {e}")
         return None
+
 
 # Function to get the response from Copilot via DirectLine
 def get_copilot_response(conversation_id):
@@ -82,6 +88,7 @@ def get_copilot_response(conversation_id):
         logger.error(f"Error getting response from Copilot: {e}")
         return "Error retrieving response."
 
+
 # Webhook to handle incoming WhatsApp messages
 @app.route("/webhook", methods=["POST"])
 def webhook():
@@ -96,12 +103,22 @@ def webhook():
     else:
         conversation_id = create_conversation()
         if not conversation_id:
-            return jsonify({"status": "error", "message": "Failed to create conversation"}), 500
+            return (
+                jsonify(
+                    {"status": "error", "message": "Failed to create conversation"}
+                ),
+                500,
+            )
         user_conversations[from_number] = conversation_id
 
     # Send the user's message to Copilot
     if send_message_to_copilot(conversation_id, incoming_message) != 200:
-        return jsonify({"status": "error", "message": "Failed to send message to Copilot"}), 500
+        return (
+            jsonify(
+                {"status": "error", "message": "Failed to send message to Copilot"}
+            ),
+            500,
+        )
 
     # Get Copilot's response
     copilot_response = get_copilot_response(conversation_id)
@@ -111,6 +128,7 @@ def webhook():
 
     return jsonify({"status": "success"}), 200
 
+
 # Function to send a message via Twilio WhatsApp
 def send_whatsapp_message(to, message):
     try:
@@ -118,16 +136,19 @@ def send_whatsapp_message(to, message):
     except Exception as e:
         logger.error(f"Error sending WhatsApp message: {e}")
 
+
 # Route for the root URL
 @app.route("/", methods=["GET"])
 def home():
     return "Welcome to the Flask app!"
+
 
 # Route for favicon.ico
 @app.route("/favicon.ico")
 def favicon():
     return app.send_static_file("favicon.ico")
 
+
 # Run Flask app
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=3003, debug=True)
+    app.run(host="0.0.0.0", port=3003, debug=True)
