@@ -1,10 +1,9 @@
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify
 from twilio.rest import Client
 import requests
-import json
-from dotenv import load_dotenv
 import os
 import logging
+from dotenv import load_dotenv
 
 # Load environment variables from .env file
 load_dotenv()
@@ -45,13 +44,10 @@ def create_conversation():
         return conversation_id
     except requests.RequestException as e:
         logger.error(f"Error creating conversation: {e}")
-        if response is not None:
-            logger.error(f"Response status code: {response.status_code}")
-            logger.error(f"Response content: {response.text}")
         return None
 
 
-# Function to send message to Copilot via DirectLine
+# Function to send a message to Copilot via DirectLine
 def send_message_to_copilot(conversation_id, user_message):
     try:
         message_url = f"{directline_url}/{conversation_id}/activities"
@@ -68,7 +64,7 @@ def send_message_to_copilot(conversation_id, user_message):
         return None
 
 
-# Function to get the response from Copilot via DirectLine
+# Function to get Copilot's response via DirectLine
 def get_copilot_response(conversation_id):
     try:
         activities_url = f"{directline_url}/{conversation_id}/activities"
@@ -81,9 +77,13 @@ def get_copilot_response(conversation_id):
         activities = response.json().get("activities", [])
 
         if len(activities) > 1:
-            return activities[-1].get("text", "Sorry, I didn’t understand that.")
-        else:
-            return "No response from Copilot."
+            # Return the last non-empty response from Copilot
+            for activity in reversed(activities):
+                if activity.get("from", {}).get("id") != "user" and activity.get(
+                    "text"
+                ):
+                    return activity.get("text", "Sorry, I didn’t understand that.")
+        return "No response from Copilot."
     except requests.RequestException as e:
         logger.error(f"Error getting response from Copilot: {e}")
         return "Error retrieving response."
@@ -133,6 +133,7 @@ def webhook():
 def send_whatsapp_message(to, message):
     try:
         client.messages.create(body=message, from_=twilio_whatsapp_number, to=to)
+        logger.info(f"Sent message to {to}: {message}")
     except Exception as e:
         logger.error(f"Error sending WhatsApp message: {e}")
 
@@ -141,12 +142,6 @@ def send_whatsapp_message(to, message):
 @app.route("/", methods=["GET"])
 def home():
     return "Welcome to the Flask app!"
-
-
-# Route for favicon.ico
-@app.route("/favicon.ico")
-def favicon():
-    return app.send_static_file("favicon.ico")
 
 
 # Run Flask app
